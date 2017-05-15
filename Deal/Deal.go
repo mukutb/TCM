@@ -597,11 +597,11 @@ func(t * ManageDeals) create_deal(stub shim.ChaincodeStubInterface, args[] strin
         return nil,nil //all stop a Deal by this name exists
     }
     //build the Deal json string manually
-    order:= `{` + `"dealId": "` + dealId + `" , ` + `"pledger": "` + Pledger + `" , ` + `"pledgee": "` + Pledgee + `" , ` + `"maxValue": "` + MaxValue + `" , ` + `"totalValueLongBoxAccount": "` + TotalValueLongBoxAccount + `" , ` + `"totalValueSegregatedAccount": "` + TotalValueSegregatedAccount + `" , ` + `"issueDate": "` + IssueDate + `" , ` + `"transactions": "` + Transactions + `" , ` + `"lastSuccessfulAllocationDate": "` + LastSuccessfulAllocationDate + `"  ` + `}`
-    //fmt.Println("order: " + order)
-    //fmt.Print("order in bytes array: ")
-    fmt.Println(order);
-    err = stub.PutState(dealId, [] byte(order)) //store Deal with dealId as key
+    deal_json:= `{` + `"dealId": "` + dealId + `" , ` + `"pledger": "` + Pledger + `" , ` + `"pledgee": "` + Pledgee + `" , ` + `"maxValue": "` + MaxValue + `" , ` + `"totalValueLongBoxAccount": "` + TotalValueLongBoxAccount + `" , ` + `"totalValueSegregatedAccount": "` + TotalValueSegregatedAccount + `" , ` + `"issueDate": "` + IssueDate + `" , ` + `"transactions": "` + Transactions + `" , ` + `"lastSuccessfulAllocationDate": "` + LastSuccessfulAllocationDate + `"  ` + `}`
+    //fmt.Println("deal_json: " + deal_json)
+    //fmt.Print("deal_json in bytes array: ")
+    fmt.Println(deal_json);
+    err = stub.PutState(dealId, [] byte(deal_json)) //store Deal with dealId as key
     if err != nil {
         return nil, err
     }
