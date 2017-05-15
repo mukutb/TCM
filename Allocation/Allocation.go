@@ -305,6 +305,7 @@ func (t *ManageAllocations) LongboxAccountUpdated(stub shim.ChaincodeStubInterfa
 				newAllStatus,
 				newTxStatus,
 				"NA")
+			fmt.Println("First call to update transaction")
 			fmt.Println(ValueTransaction)
 			result, err := stub.InvokeChaincode(_DealChaincode, invokeArgs)
 			if err != nil {
@@ -1276,6 +1277,8 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 				"Allocation Successful",
 				"Completed",
 				compliance_status)
+			fmt.Println("Second call to update transaction")
+			fmt.Println(invoke_args)
 			fmt.Println(TransactionData)
 			res, err := stub.InvokeChaincode(DealChaincode, invoke_args)
 			if err != nil {
