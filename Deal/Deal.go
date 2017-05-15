@@ -917,6 +917,7 @@ func (t *ManageDeals) deleteDeal(stub shim.ChaincodeStubInterface, args []string
 		} 
 		return nil, nil
 	}
+	fmt.Println("Deal remove")
 	// set dealId
 	dealId := args[0]
 	err := stub.DelState(dealId)						//remove the Deal from chaincode
@@ -985,6 +986,7 @@ func (t *ManageDeals) deleteTransactions(stub shim.ChaincodeStubInterface, args 
 	}
 	// set dealId
 	dealId := args[0]
+	fmt.Println("Should deal be deleted before checking")
 	err := stub.DelState(dealId)						//remove the Deal from chaincode
 	if err != nil {
 		errMsg := "{ \"message\" : \"Failed to delete state\", \"code\" : \"503\"}"
