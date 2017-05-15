@@ -494,7 +494,7 @@ func(t * ManageDeals) get_AllTransactions(stub shim.ChaincodeStubInterface, args
 // ============================================================================================================================
 func(t * ManageDeals) update_deal(stub shim.ChaincodeStubInterface, args[] string)([] byte, error) {
     var err error
-    fmt.Println("Start Updating Deal update_deal")
+    fmt.Println("Updating Deal update_deal")
     if len(args) != 9 {
         errMsg:= "{ \"message\" : \"Incorrect number of arguments. Expecting 9\", \"code\" : \"503\"}"
         err = stub.SetEvent("errEvent", [] byte(errMsg))
