@@ -1292,7 +1292,7 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 			reportInJson += `"Pledgee Segregated Securities" : ` + reallocatedSecuritiesJson + `,`
 			reportInJson += `"Allocation Date" : ` + MarginCallTimpestamp + `,`
 			reportInJson += `"Allocation Status" : "Allocation Successful"` + `,`
-			reportInJson += `"Compliance Status" : ` + compliance_status 
+			reportInJson += `"Compliance Status" : "` + compliance_status + `"` 
 			reportInJson += `}`
 			fmt.Println(reportInJson)
 
