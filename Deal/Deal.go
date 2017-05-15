@@ -1087,6 +1087,8 @@ func(t * ManageDeals) update_transaction(stub shim.ChaincodeStubInterface, args[
             `"transactionStatus": "` + args[10] + `" , ` +
             `"complianceStatus": "` + args[11] + `" ` + 
         `}`
+	    
+	fmt.Println("Transaction JSON")    
         fmt.Println(transaction_json)
         err = stub.PutState(_transactionId, [] byte(transaction_json)) //store Deal with id as key
         if err != nil {
