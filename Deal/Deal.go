@@ -520,7 +520,7 @@ func(t * ManageDeals) update_deal(stub shim.ChaincodeStubInterface, args[] strin
     if res.DealID == dealId {
         fmt.Println("Deal found with dealId : " + dealId)
         //build the Deal json string manually
-        order:= `{` + 
+        deal_json:= `{` + 
             `"dealId": "` + res.DealID + `" , ` + 
             `"pledger": "` + res.Pledger + `" , ` + 
             `"pledgee": "` + res.Pledgee + `" , ` + 
@@ -531,11 +531,12 @@ func(t * ManageDeals) update_deal(stub shim.ChaincodeStubInterface, args[] strin
             `"lastSuccessfulAllocationDate": "` + args[7] + `" ` + 
             `"transactions": "` + args[8] + `" ` + 
             `}`
-        fmt.Println(order);
-        err = stub.PutState(dealId, [] byte(order)) //store Deal with id as key
+        fmt.Println(deal_json);
+        err = stub.PutState(dealId, [] byte(deal_json)) //store Deal with id as key
         if err != nil {
             return nil, err
         }
+	fmt.Println(" ")
         fmt.Println("Deal updated succcessfully")
         tosend:= "{ \"dealId\" : \"" + dealId + "\", \"message\" : \"Deal updated succcessfully\", \"code\" : \"200\"}"
         err = stub.SetEvent("evtsender", [] byte(tosend))
