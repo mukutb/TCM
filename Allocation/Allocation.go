@@ -1275,7 +1275,7 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 				TransactionData.MarginCAllDate,
 				"Allocation Successful",
 				"Completed",
-				"\""+compliance_status+"\"")
+				compliance_status)
 			fmt.Println(TransactionData)
 			res, err := stub.InvokeChaincode(DealChaincode, invoke_args)
 			if err != nil {
