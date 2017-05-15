@@ -881,7 +881,7 @@ func(t * ManageDeals) addTransaction_inDeal(stub shim.ChaincodeStubInterface, ar
     }
     fmt.Println(res.Transactions);
     //build the Deal json string manually
-    order:= `{` + 
+    deal_json:= `{` + 
     `"dealId": "` + res.DealID + `" , ` + 
     `"pledger": "` + res.Pledger + `" , ` + 
     `"pledgee": "` + res.Pledgee + `" , ` + 
@@ -892,8 +892,8 @@ func(t * ManageDeals) addTransaction_inDeal(stub shim.ChaincodeStubInterface, ar
     `"transactions": "` + res.Transactions + `" , ` + 
     `"lastSuccessfulAllocationDate": "` + res.LastSuccessfulAllocationDate + `" ` + 
     `}`
-    fmt.Println(order);
-    err = stub.PutState(dealId, [] byte(order)) //store Deal with id as key
+    fmt.Println(deal_json);
+    err = stub.PutState(dealId, [] byte(deal_json)) //store Deal with id as key
     if err != nil {
     return nil, err
     }
