@@ -802,6 +802,9 @@ func(t * ManageDeals) getTransactions_byUser(stub shim.ChaincodeStubInterface, a
     if strings.Contains(jsonResp,"},}"){
         jsonResp = strings.Replace(jsonResp, "},}", "}}", -1)
     }
+    if strings.Contains(jsonResp,"}{"){
+	jsonResp = strings.Replace(jsonResp, "}{", "},{", -1)
+    }
     //fmt.Print("jsonResp in bytes : ")
     //fmt.Println([]byte(jsonResp))
     fmt.Println("end getTransactions_byUser")
