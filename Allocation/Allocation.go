@@ -274,19 +274,17 @@ func (t *ManageAllocations) LongboxAccountUpdated(stub shim.ChaincodeStubInterfa
 	if err != nil {
 		panic(err)
 	}
-	var newTxStatus, newAllStatus string
+	var newAllStatus string
 
 	for _, ValueTransaction := range TransactionsDataFetched {
 
 		if ValueTransaction.AllocationStatus == "Pending due to insufficient collateral" {
 
-			if _CurrentTimeStampHour <=15 && _CurrentTimeStampHour >= 0 {
+			if _CurrentTimeStampHour <=18 && _CurrentTimeStampHour >= 0 {
 				// New securites are uploaded in cutoff time
-				newTxStatus = "Ready"
 				newAllStatus = "Ready for Allocation"
 			} else {
 				// New securities not uploaded in cutoff time
-				newTxStatus = "Failed"
 				newAllStatus = "Allocation Failed"
 			}
 
@@ -303,9 +301,8 @@ func (t *ManageAllocations) LongboxAccountUpdated(stub shim.ChaincodeStubInterfa
 				"\""+ValueTransaction.CurrencyConversionRate+"\"",
 				ValueTransaction.MarginCAllDate,
 				newAllStatus,
-				newTxStatus,
+				ValueTransaction.TransactionStatus,
 				"NA")
-			fmt.Println("First call to update transaction")
 			fmt.Println(ValueTransaction)
 			result, err := stub.InvokeChaincode(_DealChaincode, invokeArgs)
 			if err != nil {
@@ -315,7 +312,6 @@ func (t *ManageAllocations) LongboxAccountUpdated(stub shim.ChaincodeStubInterfa
 			}
 			fmt.Println("Transaction hash returned: ", result)
 			fmt.Println(ValueTransaction.TransactionId + " updated with AllocationStatus as " + newAllStatus)
-			fmt.Println(ValueTransaction.TransactionId + " updated with TransactionStatus as " + newTxStatus)
 
 			//Sending event call
 			tosend := "{ \"transactionId\" : \"" + ValueTransaction.TransactionId + "\", \"message\" : \"Transaction updated succcessfully with Allocation Status as " + newAllStatus + " \", \"code\" : \"200\"}"
@@ -510,7 +506,7 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 
 	fmt.Println("Ruleset : ")
 	fmt.Println(rulesetFetched)
-	fmt.Println(resbody)
+	//fmt.Println(resbody)
 
 	//-----------------------------------------------------------------------------
 
@@ -893,10 +889,10 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 	//-----------------------------------------------------------------------------
 
 	if AvailableEligibleCollateral < RQV {
-		
+		RQVLeft:= RQV - AvailableEligibleCollateral
 		// Update transaction's allocation status to "Pending due to insufficient collateral" and transaction status to "Pending"
 		f := "update_transaction"
-		invoke_args := util.ToChaincodeArgs(f, TransactionData.TransactionId,TransactionData.TransactionDate, TransactionData.DealID, TransactionData.Pledger,TransactionData.Pledgee, TransactionData.RQV, TransactionData.Currency,"\" \"", TransactionData.MarginCAllDate, "Pending due to insufficient collateral","Matched","NA")
+		invoke_args := util.ToChaincodeArgs(f, TransactionData.TransactionId,TransactionData.TransactionDate, TransactionData.DealID, TransactionData.Pledger,TransactionData.Pledgee, TransactionData.RQV, TransactionData.Currency,"\" \"", TransactionData.MarginCAllDate, "Pending due to insufficient collateral",TransactionData.TransactionStatus,"NA")
 		fmt.Println(TransactionData);
 		result, err := stub.InvokeChaincode(DealChaincode, invoke_args)
 		if err != nil {
@@ -908,7 +904,7 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 		fmt.Println(result)
 		fmt.Println("Successfully updated allocation status to 'Pending' due to insufficient collateral'")
 	    //Send a event to event handler
-	    tosend:= "{ \"transactionId\" : \"" + TransactionData.TransactionId + "\", \"message\" : \"Transaction Allocation updated succcessfully with status 'Pending' due to insufficient collateral.\", \"code\" : \"200\"}"
+	    tosend:= "{ \"transactionId\" : \"" + TransactionData.TransactionId + "\", \"message\" : \"Transaction Allocation updated succcessfully with status 'Pending' due to insufficient collateral.\", \"code\" : \"200\",\"RQVLeft\" : \"" + strconv.FormatFloat(RQVLeft, 'f', 2, 64) + "\"}"
 	    err = stub.SetEvent("evtsender", [] byte(tosend))
 	    if err != nil {
 	        return nil, err
@@ -996,8 +992,11 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 								fmt.Println(errBool)
 							}
 							fmt.Println("effectiveValueChanged: ",effectiveValueChanged)
-							QuantityToTakeout := math.Ceil((RQVLeft * securityQuantity)/ totalValue)
+							QuantityToTakeout := math.Floor((RQVLeft * securityQuantity)/ totalValue)
 							fmt.Println("QuantityToTakeout: ", QuantityToTakeout)
+							if QuantityToTakeout ==0{
+								QuantityToTakeout = 1
+							}
 							totalValueToAllocate := QuantityToTakeout * effectiveValueChanged
 							fmt.Println(totalValueToAllocate)
 							if totalValueToAllocate > rqvEligibleValueLeft {
@@ -1031,7 +1030,7 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 							fmt.Println(errBool)
 						}
 						fmt.Println("effectiveValueChanged: ",effectiveValueChanged)
-						QuantityToTakeout := math.Ceil((rqvEligibleValueLeft * securityQuantity)/ totalValue)
+						QuantityToTakeout := math.Floor((rqvEligibleValueLeft * securityQuantity)/ totalValue)
 						fmt.Println("QuantityToTakeout: ", QuantityToTakeout)
 						totalValueToAllocate := QuantityToTakeout * effectiveValueChanged
 						fmt.Println("totalValueToAllocate: ", totalValueToAllocate)
@@ -1138,11 +1137,54 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 				valueSecurity.TotalValue = strconv.FormatFloat(newTotalValue, 'f', 2, 64)
 
 				if newQuantity <= securityQuantity && quantityAllocated >= 0 {
+					if newQuantity != 0 {
+						invokeArgs := util.ToChaincodeArgs(functionAddSecurity, valueSecurity.SecurityId,
+							PledgerLongboxAccount,
+							valueSecurity.SecuritiesName,
+							strconv.FormatFloat(newQuantity, 'f', 2, 64),
+							valueSecurity.SecurityType,
+							valueSecurity.CollateralForm,
+							valueSecurity.TotalValue,
+							valueSecurity.ValuePercentage,
+							valueSecurity.MTM,
+							valueSecurity.EffectivePercentage,
+							valueSecurity.EffectiveValueChanged,
+							valueSecurity.Currency)
+						fmt.Println(valueSecurity)
+						result, err := stub.InvokeChaincode(AccountChainCode, invokeArgs)
+						if err != nil {
+							errStr := fmt.Sprintf("Failed to update Security from 'Account' chaincode. Got error: %s", err.Error())
+							fmt.Printf(errStr)
+							return nil, errors.New(errStr)
+						}
+						fmt.Println(result)
+						sec, err := json.Marshal(valueSecurity)
+						if err != nil {
+							fmt.Println("Error while converting CombinedSecurities struct to string")
+						}
+						pledgerLongboxSecuritiesJson += string(sec)
+						if i < len(CombinedSecurities)-1 {
+							pledgerLongboxSecuritiesJson += `,`
+						}
+					}
+				}
 
+			}
+
+			pledgerLongboxSecuritiesJson += `]`
+			fmt.Println("pledgerLongboxSecuritiesJson:")
+			fmt.Println(pledgerLongboxSecuritiesJson)
+			compliance_status := "Regulatory Compliant"
+			totalValue_Pri := make(map[string]float64)
+			eligibleValue_Pub := make(map[string]float64)
+			reallocatedSecuritiesJson := `[`
+			// Update the new Securities to Pledgee Segregated A/c
+			for i, valueSecurity := range ReallocatedSecurities {
+				if valueSecurity.SecuritiesQuantity != "0.00" {
 					invokeArgs := util.ToChaincodeArgs(functionAddSecurity, valueSecurity.SecurityId,
-						PledgerLongboxAccount,
+						PledgeeSegregatedAccount,
 						valueSecurity.SecuritiesName,
-						strconv.FormatFloat(newQuantity, 'f', 2, 64),
+						valueSecurity.SecuritiesQuantity,
 						valueSecurity.SecurityType,
 						valueSecurity.CollateralForm,
 						valueSecurity.TotalValue,
@@ -1163,94 +1205,55 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 					if err != nil {
 						fmt.Println("Error while converting CombinedSecurities struct to string")
 					}
-					pledgerLongboxSecuritiesJson += string(sec)
-				}
-				if i < len(CombinedSecurities)-1 {
-					pledgerLongboxSecuritiesJson += `,`
-				}
+					reallocatedSecuritiesJson += string(sec)
+					if i < len(ReallocatedSecurities)-1 {
+						reallocatedSecuritiesJson += `,`
+					}
+					ConcentrationLimit_Pub, errBool1 := strconv.ParseFloat(SecurityJSON[valueSecurity.CollateralForm]["Concentration Limit"], 64)
+					if errBool1 != nil {
+						fmt.Println(errBool1)
+					}
+					//ConcentrationLimit_Pri := rulesetFetched.Security[valueSecurity.CollateralForm]["Concentration Limit"]
+					temp, errBool2 := strconv.ParseFloat(valueSecurity.MTM, 64)
+					if errBool2 != nil {
+						fmt.Println(errBool2)
+					}
 
-			}
+					ValuationPercentage_Pub, errBool3 := strconv.ParseFloat(SecurityJSON[valueSecurity.CollateralForm]["Valuation Percentage"], 64)
+					if errBool3 != nil {
+						fmt.Println(errBool3)
+					}
 
-			pledgerLongboxSecuritiesJson += `]`
-			compliance_status := "Regulatory Compliant"
-			totalValue_Pri := make(map[string]float64)
-			eligibleValue_Pub := make(map[string]float64)
-			reallocatedSecuritiesJson := `[`
-			// Update the new Securities to Pledgee Segregated A/c
-			for i, valueSecurity := range ReallocatedSecurities {
-				invokeArgs := util.ToChaincodeArgs(functionAddSecurity, valueSecurity.SecurityId,
-					PledgeeSegregatedAccount,
-					valueSecurity.SecuritiesName,
-					valueSecurity.SecuritiesQuantity,
-					valueSecurity.SecurityType,
-					valueSecurity.CollateralForm,
-					valueSecurity.TotalValue,
-					valueSecurity.ValuePercentage,
-					valueSecurity.MTM,
-					valueSecurity.EffectivePercentage,
-					valueSecurity.EffectiveValueChanged,
-					valueSecurity.Currency)
-				fmt.Println(valueSecurity)
-				result, err := stub.InvokeChaincode(AccountChainCode, invokeArgs)
-				if err != nil {
-					errStr := fmt.Sprintf("Failed to update Security from 'Account' chaincode. Got error: %s", err.Error())
-					fmt.Printf(errStr)
-					return nil, errors.New(errStr)
+					//ValuationPercentage_Pri := rulesetFetched.Security[valueSecurity.CollateralForm]["Valuation Percentage"]
+					effectiveValueChanged_Pri, errBool4 := strconv.ParseFloat(valueSecurity.EffectiveValueChanged, 64)
+					if errBool4 != nil {
+						fmt.Println(errBool4)
+					}
+					totalValuePri, errBool5 := strconv.ParseFloat(valueSecurity.TotalValue, 64)
+					if errBool5 != nil {
+						fmt.Println(errBool5)
+					}
+					exchange_rate := ConversionRate.Rates[valueSecurity.Currency]
+					if valueSecurity.Currency == RQVCurrency {
+						exchange_rate = 1
+					}
+					newMTM :=  temp/exchange_rate
+					fmt.Println("newMTM")
+					fmt.Println(newMTM)
+					// Effective Value =  (MTM(market Value) * valuePercentage)/100
+					effectiveValueChangedPub := (newMTM * ValuationPercentage_Pub)/100
+					fmt.Println("effectiveValueChangedPub")
+					fmt.Println(effectiveValueChangedPub)
+					if effectiveValueChangedPub < effectiveValueChanged_Pri{
+						compliance_status = "Regulatory Non-Compliant"
+					}
+					eligibleValuePub := ConcentrationLimit_Pub * RQV
+					totalValue_Pri[valueSecurity.CollateralForm] += totalValuePri
+					eligibleValue_Pub[valueSecurity.CollateralForm] += eligibleValuePub
 				}
-				fmt.Println(result)
-				sec, err := json.Marshal(valueSecurity)
-				if err != nil {
-					fmt.Println("Error while converting CombinedSecurities struct to string")
-				}
-				reallocatedSecuritiesJson += string(sec)
-				if i < len(ReallocatedSecurities)-1 {
-					reallocatedSecuritiesJson += `,`
-				}
-				ConcentrationLimit_Pub, errBool1 := strconv.ParseFloat(SecurityJSON[valueSecurity.CollateralForm]["Concentration Limit"], 64)
-				if errBool1 != nil {
-					fmt.Println(errBool1)
-				}
-				//ConcentrationLimit_Pri := rulesetFetched.Security[valueSecurity.CollateralForm]["Concentration Limit"]
-				temp, errBool2 := strconv.ParseFloat(valueSecurity.MTM, 64)
-				if errBool2 != nil {
-					fmt.Println(errBool2)
-				}
-
-				ValuationPercentage_Pub, errBool3 := strconv.ParseFloat(SecurityJSON[valueSecurity.CollateralForm]["Valuation Percentage"], 64)
-				if errBool3 != nil {
-					fmt.Println(errBool3)
-				}
-
-				//ValuationPercentage_Pri := rulesetFetched.Security[valueSecurity.CollateralForm]["Valuation Percentage"]
-				effectiveValueChanged_Pri, errBool4 := strconv.ParseFloat(valueSecurity.EffectiveValueChanged, 64)
-				if errBool4 != nil {
-					fmt.Println(errBool4)
-				}
-				totalValuePri, errBool5 := strconv.ParseFloat(valueSecurity.TotalValue, 64)
-				if errBool5 != nil {
-					fmt.Println(errBool5)
-				}
-				exchange_rate := ConversionRate.Rates[valueSecurity.Currency]
-				if valueSecurity.Currency == RQVCurrency {
-					exchange_rate = 1
-				}
-				newMTM :=  temp/exchange_rate
-				fmt.Println("newMTM")
-				fmt.Println(newMTM)
-				// Effective Value =  (MTM(market Value) * valuePercentage)/100
-				effectiveValueChangedPub := (newMTM * ValuationPercentage_Pub)/100
-				fmt.Println("effectiveValueChangedPub")
-				fmt.Println(effectiveValueChangedPub)
-				if effectiveValueChangedPub < effectiveValueChanged_Pri{
-					compliance_status = "Regulatory Non-Compliant"
-				}
-				eligibleValuePub := ConcentrationLimit_Pub * RQV
-				totalValue_Pri[valueSecurity.CollateralForm] += totalValuePri
-				eligibleValue_Pub[valueSecurity.CollateralForm] += eligibleValuePub
-
 			}
 			for key := range totalValue_Pri{
-				if totalValue_Pri[key] < eligibleValue_Pub[key] {
+				if totalValue_Pri[key] > eligibleValue_Pub[key] {
 					compliance_status = "Regulatory Non-Compliant"	
 				}
 			}
@@ -1275,10 +1278,8 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 				ConversionRateAsString,
 				TransactionData.MarginCAllDate,
 				"Allocation Successful",
-				"Completed",
+				TransactionData.TransactionStatus,
 				compliance_status)
-			fmt.Println("Second call to update transaction")
-			fmt.Println(invoke_args)
 			fmt.Println(TransactionData)
 			res, err := stub.InvokeChaincode(DealChaincode, invoke_args)
 			if err != nil {
@@ -1295,7 +1296,7 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 			reportInJson += `"Pledgee Segregated Securities" : ` + reallocatedSecuritiesJson + `,`
 			reportInJson += `"Allocation Date" : ` + MarginCallTimpestamp + `,`
 			reportInJson += `"Allocation Status" : "Allocation Successful"` + `,`
-			reportInJson += `"Compliance Status" : "` + compliance_status + `"` 
+			reportInJson += `"Compliance Status" : ` + "\""+compliance_status+ "\"" 
 			reportInJson += `}`
 			fmt.Println(reportInJson)
 
@@ -1306,7 +1307,7 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 			}
 		} else {
 			f := "update_transaction"
-			invoke_args := util.ToChaincodeArgs(f, TransactionData.TransactionId, TransactionData.TransactionDate, TransactionData.DealID, TransactionData.Pledger, TransactionData.Pledgee, TransactionData.RQV, TransactionData.Currency, "\" \"", TransactionData.MarginCAllDate, "Pending due to insufficient collateral", "Matched","NA")
+			invoke_args := util.ToChaincodeArgs(f, TransactionData.TransactionId, TransactionData.TransactionDate, TransactionData.DealID, TransactionData.Pledger, TransactionData.Pledgee, TransactionData.RQV, TransactionData.Currency, "\" \"", TransactionData.MarginCAllDate, "Pending due to insufficient collateral", TransactionData.TransactionStatus,"NA")
 			fmt.Println(TransactionData)
 			result, err := stub.InvokeChaincode(DealChaincode, invoke_args)
 			if err != nil {
@@ -1318,7 +1319,7 @@ func (t *ManageAllocations) start_allocation(stub shim.ChaincodeStubInterface, a
 			fmt.Println(result)
 			fmt.Println("Successfully updated allocation status to 'Pending' due to insufficient collateral'")
 			//Send a event to event handler
-			tosend := "{ \"transactionId\" : \"" + TransactionData.TransactionId + "\", \"message\" : \"Transaction Allocation updated succcessfully with status 'Pending' due to insufficient collateral.\", \"code\" : \"200\"}"
+			tosend := "{ \"transactionId\" : \"" + TransactionData.TransactionId + "\", \"message\" : \"Transaction Allocation updated succcessfully with status 'Pending' due to insufficient collateral.\", \"code\" : \"200\",\"RQVLeft\" : \"" + strconv.FormatFloat(RQVLeft, 'f', 2, 64) + "\"}"
 			err = stub.SetEvent("evtsender", []byte(tosend))
 			if err != nil {
 				return nil, err
